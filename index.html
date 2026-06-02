@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TriageAI — AI-Powered Customer Triage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0f12;
+    --surface: #13161b;
+    --surface-2: #1a1d24;
+    --border: rgba(255,255,255,0.07);
+    --border-2: rgba(255,255,255,0.12);
+    --text: #e8eaf0;
+    --muted: #6b7280;
+    --accent: #6ee7b7;
+    --accent-dim: rgba(110,231,183,0.12);
+    --accent-border: rgba(110,231,183,0.3);
+    --red: #f87171;
+    --red-dim: rgba(248,113,113,0.1);
+    --amber: #fbbf24;
+    --amber-dim: rgba(251,191,36,0.1);
+    --blue: #60a5fa;
+    --blue-dim: rgba(96,165,250,0.1);
+    --purple: #a78bfa;
+    --purple-dim: rgba(167,139,250,0.1);
+    --font: 'DM Sans', sans-serif;
+    --mono: 'DM Mono', monospace;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Layout */
+  .shell { display: flex; flex-direction: column; min-height: 100vh; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    padding: 0 28px;
+    height: 56px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .logo::before {
+    content: '';
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  nav { display: flex; gap: 2px; margin-left: auto; }
+  .nav-btn {
+    background: none; border: none;
+    font-family: var(--font); font-size: 13px;
+    color: var(--muted); cursor: pointer;
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    transition: all 0.15s;
+  }
+  .nav-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
+  .nav-btn.active { color: var(--text); background: rgba(255,255,255,0.07); }
+
+  .status-dot {
+    margin-left: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .status-dot span {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--accent);
+  }
+
+  main { flex: 1; padding: 28px; max-width: 940px; margin: 0 auto; width: 100%; }
+
+  /* Triage tab */
+  .triage-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 700px) { .triage-layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+
+  .panel-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+  }
+
+  .samples-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sample-btn {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; padding: 4px 10px;
+    border-radius: var(--radius-sm); transition: all 0.15s;
+  }
+  .sample-btn:hover { border-color: var(--border-2); color: var(--text); }
+
+  textarea {
+    width: 100%; background: var(--surface-2);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-family: var(--font); font-size: 13px;
+    padding: 12px 14px; resize: vertical; min-height: 160px;
+    line-height: 1.6; outline: none; transition: border-color 0.15s;
+  }
+  textarea:focus { border-color: var(--border-2); }
+  textarea::placeholder { color: var(--muted); }
+
+  .triage-btn {
+    width: 100%; margin-top: 12px;
+    background: var(--accent); color: #0d0f12;
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    border: none; border-radius: var(--radius-sm);
+    padding: 11px; cursor: pointer; transition: all 0.15s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .triage-btn:hover:not(:disabled) { filter: brightness(1.1); }
+  .triage-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Spinner */
+  .spinner {
+    width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.2);
+    border-top-color: #0d0f12; border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Result panel */
+  .result-empty {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100%; min-height: 260px;
+    color: var(--muted); gap: 8px;
+  }
+  .result-empty .icon { font-size: 32px; opacity: 0.3; }
+  .result-empty p { font-size: 13px; }
+
+  .result-content { animation: fadeIn 0.3s ease; }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+
+  .result-header {
+    display: flex; align-items: center; gap: 8px;
+    flex-wrap: wrap; margin-bottom: 16px;
+    padding-bottom: 14px; border-bottom: 1px solid var(--border);
+  }
+
+  .badge {
+    font-family: var(--mono); font-size: 11px; font-weight: 500;
+    padding: 3px 9px; border-radius: 20px;
+  }
+  .badge-id { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
+  .badge-u5, .badge-u4 { background: var(--red-dim); color: var(--red); border: 1px solid rgba(248,113,113,0.2); }
+  .badge-u3 { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(251,191,36,0.2); }
+  .badge-u2, .badge-u1 { background: var(--accent-dim); color: var(--accent); border: 1px solid var(--accent-border); }
+  .badge-team { background: var(--blue-dim); color: var(--blue); border: 1px solid rgba(96,165,250,0.2); }
+  .badge-sentiment { background: var(--purple-dim); color: var(--purple); border: 1px solid rgba(167,139,250,0.2); }
+
+  .result-fields { display: flex; flex-direction: column; gap: 12px; }
+  .result-field label {
+    display: block; font-family: var(--mono); font-size: 10px;
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .result-field .value {
+    font-size: 13px; color: var(--text); line-height: 1.5;
+    background: var(--surface-2); border-radius: var(--radius-sm);
+    padding: 10px 12px;
+  }
+  .reasoning-value { font-size: 12px; color: #9ca3af; }
+
+  /* Metrics */
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 20px; }
+  @media (max-width: 600px) { .metrics { grid-template-columns: repeat(2,1fr); } }
+  .metric {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .metric-val { font-size: 26px; font-weight: 500; color: var(--text); }
+  .metric-lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Table */
+  .filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
+  .filter-btn {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted); cursor: pointer; padding: 5px 12px;
+    border-radius: var(--radius-sm); transition: all 0.15s;
+  }
+  .filter-btn:hover { color: var(--text); border-color: var(--border-2); }
+  .filter-btn.active { color: var(--accent); border-color: var(--accent-border); background: var(--accent-dim); }
+
+  .table-wrap {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); overflow: hidden;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    font-family: var(--mono); font-size: 10px; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--muted); font-weight: 500;
+    padding: 10px 14px; text-align: left;
+    border-bottom: 1px solid var(--border); background: var(--surface-2);
+  }
+  td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.015); }
+  .msg-cell { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
+  .mono-cell { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .intent-cell { font-size: 12px; }
+
+  /* Config */
+  .config-section { margin-bottom: 24px; }
+  .config-title { font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+  .config-hint { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.5; }
+
+  .rule-row {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .rule-lbl { font-size: 12px; color: var(--muted); white-space: nowrap; }
+
+  input[type="text"], select {
+    background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--font); font-size: 13px;
+    padding: 7px 10px; border-radius: var(--radius-sm); outline: none;
+    transition: border-color 0.15s;
+  }
+  input[type="text"]:focus, select:focus { border-color: var(--border-2); }
+  select option { background: var(--surface); }
+  input[type="text"] { width: 130px; }
+
+  .remove-btn {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    font-size: 12px; padding: 6px 10px; border-radius: var(--radius-sm);
+    cursor: pointer; transition: all 0.15s;
+  }
+  .remove-btn:hover { color: var(--red); border-color: rgba(248,113,113,0.3); }
+
+  .add-rule-btn {
+    background: none; border: 1px dashed var(--border-2);
+    color: var(--muted); font-family: var(--font); font-size: 12px;
+    padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: all 0.15s; margin-top: 6px;
+  }
+  .add-rule-btn:hover { color: var(--text); border-color: var(--border-2); }
+
+  .save-btn {
+    background: var(--accent); color: #0d0f12;
+    font-family: var(--font); font-size: 13px; font-weight: 600;
+    border: none; border-radius: var(--radius-sm);
+    padding: 10px 24px; cursor: pointer; transition: all 0.15s;
+  }
+  .save-btn:hover { filter: brightness(1.1); }
+  .save-btn.saved { background: var(--surface-2); color: var(--accent); border: 1px solid var(--accent-border); }
+
+  .error-msg { color: var(--red); font-size: 12px; margin-top: 8px; }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* API key banner */
+  .api-banner {
+    background: var(--amber-dim); border: 1px solid rgba(251,191,36,0.2);
+    border-radius: var(--radius); padding: 12px 16px; margin-bottom: 20px;
+    font-size: 13px; color: var(--amber);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .api-key-input {
+    flex: 1; background: rgba(0,0,0,0.3); border: 1px solid rgba(251,191,36,0.3);
+    color: var(--text); font-family: var(--mono); font-size: 12px;
+    padding: 6px 10px; border-radius: var(--radius-sm); outline: none;
+    min-width: 0;
+  }
+  .set-key-btn {
+    background: var(--amber); color: #0d0f12; border: none;
+    font-family: var(--font); font-size: 12px; font-weight: 600;
+    padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <header>
+    <div class="logo">TriageAI</div>
+    <nav>
+      <button class="nav-btn active" onclick="showTab('triage', this)">Triage</button>
+      <button class="nav-btn" onclick="showTab('dashboard', this)">Dashboard</button>
+      <button class="nav-btn" onclick="showTab('config', this)">Config</button>
+    </nav>
+    <div class="status-dot"><span></span><span id="ticket-count">0 tickets</span></div>
+  </header>
+
+  <main>
+    <!-- API Key Banner -->
+    <div class="api-banner" id="api-banner">
+      <span>⚠</span>
+      <span>Enter your Anthropic API key to enable live triage:</span>
+      <input class="api-key-input" type="password" id="api-key-input" placeholder="sk-ant-..." />
+      <button class="set-key-btn" onclick="setApiKey()">Connect</button>
+    </div>
+
+    <!-- Triage Tab -->
+    <div class="tab-content active" id="tab-triage">
+      <div class="triage-layout">
+        <div class="panel">
+          <div class="panel-label">Inbound message</div>
+          <div class="samples-row">
+            <button class="sample-btn" onclick="loadSample(0)">McDonald's Order Issue</button>
+            <button class="sample-btn" onclick="loadSample(1)">Gov Accessibility</button>
+            <button class="sample-btn" onclick="loadSample(2)">Enterprise Upgrade</button>
+            <button class="sample-btn" onclick="loadSample(3)">Critical Outage</button>
+          </div>
+          <textarea id="msg-input" placeholder="Paste any inbound message — support ticket, email, Slack message..."></textarea>
+          <button class="triage-btn" id="triage-btn" onclick="runTriage()">
+            Triage message →
+          </button>
+          <div class="error-msg" id="error-msg"></div>
+        </div>
+
+        <div class="panel" id="result-panel">
+          <div class="panel-label">Triage result</div>
+          <div class="result-empty" id="result-empty">
+            <div class="icon">⬡</div>
+            <p>Result will appear here</p>
+          </div>
+          <div class="result-content" id="result-content" style="display:none"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dashboard Tab -->
+    <div class="tab-content" id="tab-dashboard">
+      <div class="metrics" id="metrics-row"></div>
+      <div class="filter-row" id="filter-row"></div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Message</th><th>Intent</th><th>Urgency</th><th>Sentiment</th><th>Team</th>
+            </tr>
+          </thead>
+          <tbody id="tickets-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Config Tab -->
+    <div class="tab-content" id="tab-config">
+      <div class="panel" style="max-width:600px">
+        <div class="panel-label">Routing configuration</div>
+        <div class="config-hint">
+          These rules are injected directly into Claude's system prompt. Change them, then re-triage
+          the same message on the Triage tab to see the routing change in real time. This is the demo moment.
+        </div>
+        <div class="config-section">
+          <div class="config-title">Routing rules</div>
+          <div id="rules-container"></div>
+          <button class="add-rule-btn" onclick="addRule()">+ Add rule</button>
+        </div>
+        <button class="save-btn" id="save-btn" onclick="saveConfig()">Save & apply</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const SAMPLES = [
+  "Our drive-through display showed the wrong combo for table 14 during the dinner rush. The customer was charged for items they didn't order and is requesting a refund. This is the third time this week.",
+  "The new portal is inaccessible on screen readers since the last update. We support hundreds of citizens with disabilities and this is a compliance issue under Section 508. We need an urgent fix.",
+  "We're onboarding 3 new enterprise clients next quarter and our current API limits won't scale. Can someone from sales walk me through the Enterprise tier pricing and SLA commitments before our board meeting Friday?",
+  "CRITICAL: Production database is throwing 500 errors across all regions. Every customer-facing service is down. We have 40,000 active users right now and our CTO is asking for a status update every 5 minutes."
+];
+
+const SEED_TICKETS = [
+
+  // ── SaaS ──────────────────────────────────────────────────────────────────
+  {
+    id: "a1b2",
+    message: "My invoice shows the wrong amount for the third month in a row. I've raised this twice already and nothing has changed. If this isn't fixed today I'm disputing the charge with my bank.",
+    intent: "billing_dispute",
+    urgency: 5,
+    sentiment: "angry",
+    assigned_team: "Finance",
+    draft_response: "I sincerely apologize — repeated billing errors are completely unacceptable. I'm escalating this to our Finance lead right now and you'll have a corrected invoice and written confirmation within 2 hours."
+  },
+  {
+    id: "c3d4",
+    message: "Can you help me understand how API rate limits work on the Growth plan? We're building an integration and need to know the per-minute ceiling before we architect the retry logic.",
+    intent: "general_inquiry",
+    urgency: 1,
+    sentiment: "neutral",
+    assigned_team: "Support",
+    draft_response: "Happy to help! The Growth plan allows 2,000 requests per minute with burst headroom up to 3,000. I'll send you our full rate-limit documentation and some example retry patterns right now."
+  },
+  {
+    id: "e5f6",
+    message: "The CSV export has been broken since your 2.4 release yesterday. Our entire nightly data pipeline feeds from it and we missed our SLA window this morning. Engineering needs to hotfix this today.",
+    intent: "bug_report",
+    urgency: 5,
+    sentiment: "angry",
+    assigned_team: "Engineering",
+    draft_response: "A broken export pipeline is a critical blocker and I'm paging Engineering now. We're targeting a hotfix within 2 hours and I'll send you live status updates every 30 minutes until it's resolved."
+  },
+  {
+    id: "g7h8",
+    message: "We're onboarding a new department next month and need to add 15 seats. Can someone from sales walk me through the volume pricing before our budget review on Thursday?",
+    intent: "upgrade_request",
+    urgency: 2,
+    sentiment: "positive",
+    assigned_team: "Sales",
+    draft_response: "Great news on the team expansion! I'll have your Account Executive reach out by end of day today with volume pricing options and a proposal ready for your Thursday review."
+  },
+  {
+    id: "i9j0",
+    message: "We need a HIPAA BAA executed before we can move patient data into the platform. Our compliance team is asking for a signed copy within the week or we can't proceed with the rollout.",
+    intent: "legal_compliance",
+    urgency: 4,
+    sentiment: "neutral",
+    assigned_team: "Legal",
+    draft_response: "Understood — HIPAA compliance is a top priority. I'm routing this to our Legal team immediately and you can expect a BAA draft for review within 1 business day."
+  },
+  {
+    id: "k1l2",
+    message: "SSO stopped working for our entire org after your maintenance window last night. 200 users can't log in. Our IT team has confirmed it's on your end — SAML assertions are returning a 401.",
+    intent: "bug_report",
+    urgency: 5,
+    sentiment: "frustrated",
+    assigned_team: "Engineering",
+    draft_response: "A company-wide SSO outage is our highest priority incident. I'm escalating to Engineering and our on-call security team right now — expect an initial diagnosis within 20 minutes and I'll stay on this with you."
+  },
+
+  // ── Retail / QSR ──────────────────────────────────────────────────────────
+  {
+    id: "m3n4",
+    message: "The digital menu board at store #142 has been displaying yesterday's promotional pricing since this morning. Customers are being charged the correct amount but the display mismatch is causing complaints at the counter.",
+    intent: "bug_report",
+    urgency: 3,
+    sentiment: "negative",
+    assigned_team: "Engineering",
+    draft_response: "A pricing display mismatch creates real friction at the counter and I understand the urgency. I've flagged store #142 for our Operations team — a remote config refresh is being pushed now and someone will confirm resolution within the hour."
+  },
+  {
+    id: "o5p6",
+    message: "Three customers at location #88 were charged twice for the same order during the Saturday rush. Total overcharge is $47.85 across the three transactions. Need refunds processed and an explanation for the root cause.",
+    intent: "billing_dispute",
+    urgency: 4,
+    sentiment: "frustrated",
+    assigned_team: "Finance",
+    draft_response: "I apologize for the duplicate charges — I'm processing all three refunds now and customers should see them within 3–5 business days. Our Engineering team is also reviewing the Saturday transaction logs to identify the root cause."
+  },
+  {
+    id: "p6q7",
+    message: "The self-order kiosk at our busiest location is completely unresponsive after the latest firmware push. We're handling everything manually and the queue is backing up badly.",
+    intent: "bug_report",
+    urgency: 5,
+    sentiment: "angry",
+    assigned_team: "Engineering",
+    draft_response: "A downed kiosk during peak hours is a critical operations issue. I'm contacting our field support team for an emergency on-site visit and rolling back the firmware push to restore service as fast as possible."
+  },
+  {
+    id: "r8s9",
+    message: "We'd like to pilot your loyalty program integration across 5 test locations before the full chain rollout. Who's the right person to talk to about scoping that engagement?",
+    intent: "upgrade_request",
+    urgency: 2,
+    sentiment: "positive",
+    assigned_team: "Sales",
+    draft_response: "A loyalty integration pilot sounds like a great fit. I'll connect you with our Retail Solutions team today — they've run similar multi-location pilots and can scope a timeline that works for your rollout calendar."
+  },
+
+  // ── Government / Public Sector ────────────────────────────────────────────
+  {
+    id: "t0u1",
+    message: "The citizen portal has been returning a 503 error for the past 90 minutes. We have residents trying to submit permit applications before today's 5pm deadline and they cannot access the system.",
+    intent: "bug_report",
+    urgency: 5,
+    sentiment: "angry",
+    assigned_team: "Engineering",
+    draft_response: "A portal outage ahead of a submission deadline is our highest urgency. Engineering is on this now — I'll have a status update in 15 minutes and we're assessing whether the deadline can be extended for affected applicants."
+  },
+  {
+    id: "v2w3",
+    message: "Our accessibility audit found that the updated forms are not compatible with JAWS screen readers, which puts us in violation of Section 508. We need a remediation plan in writing before our next compliance review.",
+    intent: "legal_compliance",
+    urgency: 4,
+    sentiment: "neutral",
+    assigned_team: "Legal",
+    draft_response: "Section 508 compliance is a firm requirement and we take this seriously. I'm looping in our Legal and Accessibility teams now — you'll receive a written remediation plan with a timeline within 2 business days."
+  },
+  {
+    id: "x4y5",
+    message: "We've been waiting 6 weeks for our data migration to complete. Our go-live date is in 10 days and we still don't have confirmation that our legacy records have transferred correctly.",
+    intent: "general_inquiry",
+    urgency: 4,
+    sentiment: "frustrated",
+    assigned_team: "Support",
+    draft_response: "A 6-week wait with a go-live in 10 days is not acceptable and I'm escalating this to our migration team lead immediately. You'll have a full status report and validated record count by end of business today."
+  },
+  {
+    id: "z6a7",
+    message: "Quick question — is there a bulk import option for uploading multiple service requests at once? We process about 500 submissions a week and doing them one-by-one isn't sustainable.",
+    intent: "general_inquiry",
+    urgency: 1,
+    sentiment: "neutral",
+    assigned_team: "Support",
+    draft_response: "Yes — bulk import via CSV is available on your current plan. I'll send you the template and step-by-step guide right now so your team can start processing in batches immediately."
+  },
+
+  // ── Healthcare ────────────────────────────────────────────────────────────
+  {
+    id: "b8c9",
+    message: "The patient scheduling module sent appointment reminders to the wrong patient list this morning — roughly 200 patients received someone else's appointment details. This is a potential HIPAA breach and our compliance officer needs to be involved.",
+    intent: "legal_compliance",
+    urgency: 5,
+    sentiment: "angry",
+    assigned_team: "Legal",
+    draft_response: "This is a critical compliance incident and I'm escalating to our Legal and Security teams immediately. We're initiating our breach response protocol now and will have a full incident report to your compliance officer within 4 hours."
+  },
+  {
+    id: "d0e1",
+    message: "The HL7 FHIR integration stopped syncing patient records from our EHR about 4 hours ago. Our clinical staff are working from stale data and we need this restored before the afternoon shift.",
+    intent: "bug_report",
+    urgency: 5,
+    sentiment: "frustrated",
+    assigned_team: "Engineering",
+    draft_response: "A stale EHR sync before an afternoon shift is a patient safety concern. Engineering is investigating the FHIR endpoint now and I'll have a status update within 30 minutes — we're treating this as our top active incident."
+  },
+  {
+    id: "f2g3",
+    message: "We're expanding to two new clinic locations and need to understand your per-provider licensing model. Would our current enterprise agreement cover the new sites or would we need an addendum?",
+    intent: "upgrade_request",
+    urgency: 2,
+    sentiment: "positive",
+    assigned_team: "Sales",
+    draft_response: "Congratulations on the expansion! I'll have your Account Executive review your current enterprise agreement today and come back with a clear answer on coverage and any addendum requirements before end of week."
+  },
+  {
+    id: "h4i5",
+    message: "The mobile app crashes consistently when clinicians try to open patient history records on iOS 17.4. This is blocking our nursing staff from accessing critical information during rounds.",
+    intent: "bug_report",
+    urgency: 4,
+    sentiment: "negative",
+    assigned_team: "Engineering",
+    draft_response: "A crash blocking patient history access during rounds is a clinical workflow issue we're treating urgently. Engineering is reproducing on iOS 17.4 now and I'll have a fix timeline within 2 hours."
+  },
+  {
+    id: "j6k7",
+    message: "Just wanted to say the new lab results dashboard has been a huge improvement for our team. The turnaround visibility alone has saved us hours of manual follow-up each week.",
+    intent: "general_inquiry",
+    urgency: 1,
+    sentiment: "positive",
+    assigned_team: "Support",
+    draft_response: "This genuinely means a lot to hear — thank you. I'll make sure this feedback gets to the product team who built the lab results dashboard. It's exactly the outcome they were designing for."
+  },
+  {
+    id: "l8m9",
+    message: "One of our physicians was locked out of their account mid-shift and the self-service reset isn't working. They need access restored immediately — they're currently unable to document patient encounters.",
+    intent: "account_access",
+    urgency: 5,
+    sentiment: "frustrated",
+    assigned_team: "Support",
+    draft_response: "A physician locked out mid-shift is our highest priority access issue. I'm manually resetting the account right now and will have credentials back to them within 5 minutes — please keep this channel open."
+  }
+];
+
+let tickets = [...SEED_TICKETS];
+let apiKey = localStorage.getItem('triage_api_key') || '';
+let activeFilter = 'all';
+let config = {
+  teams: ["Support", "Finance", "Engineering", "Sales", "Legal"],
+  routing_rules: [
+    { keyword: "billing", team: "Finance" },
+    { keyword: "refund", team: "Finance" },
+    { keyword: "bug", team: "Engineering" },
+    { keyword: "outage", team: "Engineering" },
+    { keyword: "upgrade", team: "Sales" },
+    { keyword: "legal", team: "Legal" },
+    { keyword: "GDPR", team: "Legal" },
+    { keyword: "HIPAA", team: "Legal" },
+  ]
+};
+
+function init() {
+  if (apiKey) {
+    document.getElementById('api-banner').style.display = 'none';
+    document.getElementById('api-key-input').value = apiKey;
+  }
+  renderDashboard();
+  renderConfig();
+  updateCount();
+}
+
+function setApiKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  apiKey = val;
+  localStorage.setItem('triage_api_key', val);
+  document.getElementById('api-banner').style.display = 'none';
+}
+
+function showTab(tab, btn) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'config') renderConfig();
+}
+
+function loadSample(i) {
+  document.getElementById('msg-input').value = SAMPLES[i];
+}
+
+function buildSystemPrompt() {
+  const teams = config.teams.join(', ');
+  const rules = config.routing_rules.map(r => `- Messages about "${r.keyword}" → route to ${r.team}`).join('\n');
+  return `You are an intelligent customer support triage engine.
+
+Available teams: ${teams}
+
+Routing rules:
+${rules}
+
+When routing, apply the most specific matching rule. If no rule matches, use your judgment to assign the most appropriate team. Always consider customer sentiment when setting urgency.`;
+}
+
+async function runTriage() {
+  const message = document.getElementById('msg-input').value.trim();
+  if (!message) return;
+  if (!apiKey) {
+    document.getElementById('error-msg').textContent = 'Please enter your Anthropic API key above.';
+    return;
+  }
+
+  const btn = document.getElementById('triage-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Triaging...';
+  document.getElementById('error-msg').textContent = '';
+  document.getElementById('result-empty').style.display = 'none';
+  document.getElementById('result-content').style.display = 'none';
+
+  const tools = [{
+    name: "triage_ticket",
+    description: "Classify and triage an inbound customer message.",
+    input_schema: {
+      type: "object",
+      properties: {
+        intent: { type: "string", description: "Primary intent: billing_dispute, bug_report, feature_request, account_access, upgrade_request, legal_compliance, general_inquiry, cancellation" },
+        urgency: { type: "integer", description: "Urgency 1–5 (1=low, 5=critical)", minimum: 1, maximum: 5 },
+        sentiment: { type: "string", enum: ["positive", "neutral", "negative", "frustrated", "angry"] },
+        assigned_team: { type: "string", description: "Which team handles this based on routing rules" },
+        draft_response: { type: "string", description: "Professional, empathetic 2-sentence draft response to the customer." },
+        reasoning: { type: "string", description: "Brief explanation of classification decisions." }
+      },
+      required: ["intent", "urgency", "sentiment", "assigned_team", "draft_response", "reasoning"]
+    }
+  }];
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: buildSystemPrompt(),
+        tools: tools,
+        tool_choice: { type: 'tool', name: 'triage_ticket' },
+        messages: [{ role: 'user', content: message }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'API error');
+    }
+
+    const data = await res.json();
+    const toolBlock = data.content.find(b => b.type === 'tool_use' && b.name === 'triage_ticket');
+    if (!toolBlock) throw new Error('No triage result returned');
+
+    const result = {
+      id: Math.random().toString(36).slice(2, 6),
+      message,
+      timestamp: new Date().toISOString(),
+      ...toolBlock.input
+    };
+
+    tickets.unshift(result);
+    renderResult(result);
+    updateCount();
+
+  } catch (e) {
+    document.getElementById('result-empty').style.display = 'flex';
+    document.getElementById('error-msg').textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Triage message →';
+  }
+}
+
+function urgencyClass(u) {
+  return `badge-u${u}`;
+}
+
+function urgencyLabel(u) {
+  return ['', 'Minimal', 'Low', 'Medium', 'High', 'Critical'][u] || 'Medium';
+}
+
+function renderResult(r) {
+  const content = document.getElementById('result-content');
+  content.innerHTML = `
+    <div class="result-header">
+      <span class="badge badge-id">#${r.id}</span>
+      <span class="badge ${urgencyClass(r.urgency)}">${r.urgency} — ${urgencyLabel(r.urgency)}</span>
+      <span class="badge badge-sentiment">${r.sentiment}</span>
+      <span class="badge badge-team">${r.assigned_team}</span>
+    </div>
+    <div class="result-fields">
+      <div class="result-field">
+        <label>Intent</label>
+        <div class="value">${r.intent.replace(/_/g,' ')}</div>
+      </div>
+      <div class="result-field">
+        <label>Draft response</label>
+        <div class="value">${r.draft_response}</div>
+      </div>
+      <div class="result-field">
+        <label>Reasoning</label>
+        <div class="value reasoning-value">${r.reasoning}</div>
+      </div>
+    </div>
+  `;
+  content.style.display = 'block';
+}
+
+function renderDashboard() {
+  const filtered = activeFilter === 'all' ? tickets : tickets.filter(t => t.assigned_team === activeFilter);
+  const teams = ['all', ...new Set(tickets.map(t => t.assigned_team))];
+  const total = tickets.length;
+  const avg = total ? (tickets.reduce((s,t) => s + t.urgency, 0) / total).toFixed(1) : 0;
+  const high = tickets.filter(t => t.urgency >= 4).length;
+
+  document.getElementById('metrics-row').innerHTML = [
+    ['Total tickets', total],
+    ['Avg urgency', avg],
+    ['High urgency', high],
+    ['Teams active', new Set(tickets.map(t=>t.assigned_team)).size]
+  ].map(([l,v]) => `<div class="metric"><div class="metric-val">${v}</div><div class="metric-lbl">${l}</div></div>`).join('');
+
+  document.getElementById('filter-row').innerHTML = teams.map(t =>
+    `<button class="filter-btn${activeFilter===t?' active':''}" onclick="setFilter('${t}')">${t}</button>`
+  ).join('');
+
+  document.getElementById('tickets-tbody').innerHTML = filtered.map(t => `
+    <tr>
+      <td class="mono-cell">#${t.id}</td>
+      <td class="msg-cell">${t.message}</td>
+      <td class="intent-cell">${t.intent.replace(/_/g,' ')}</td>
+      <td><span class="badge ${urgencyClass(t.urgency)}">${t.urgency} — ${urgencyLabel(t.urgency)}</span></td>
+      <td><span class="badge badge-sentiment">${t.sentiment}</span></td>
+      <td><span class="badge badge-team">${t.assigned_team}</span></td>
+    </tr>
+  `).join('');
+}
+
+function setFilter(team) {
+  activeFilter = team;
+  renderDashboard();
+}
+
+function renderConfig() {
+  const container = document.getElementById('rules-container');
+  container.innerHTML = config.routing_rules.map((r, i) => `
+    <div class="rule-row">
+      <span class="rule-lbl">If message contains</span>
+      <input type="text" value="${r.keyword}" onchange="updateRule(${i},'keyword',this.value)" placeholder="keyword" />
+      <span class="rule-lbl">→ route to</span>
+      <select onchange="updateRule(${i},'team',this.value)">
+        ${config.teams.map(t => `<option${t===r.team?' selected':''}>${t}</option>`).join('')}
+      </select>
+      <button class="remove-btn" onclick="removeRule(${i})">✕</button>
+    </div>
+  `).join('');
+}
+
+function updateRule(i, field, value) {
+  config.routing_rules[i][field] = value;
+}
+
+function addRule() {
+  config.routing_rules.push({ keyword: '', team: config.teams[0] });
+  renderConfig();
+}
+
+function removeRule(i) {
+  config.routing_rules.splice(i, 1);
+  renderConfig();
+}
+
+function saveConfig() {
+  const btn = document.getElementById('save-btn');
+  btn.textContent = 'Saved ✓';
+  btn.classList.add('saved');
+  setTimeout(() => {
+    btn.textContent = 'Save & apply';
+    btn.classList.remove('saved');
+  }, 2000);
+}
+
+function updateCount() {
+  document.getElementById('ticket-count').textContent = `${tickets.length} tickets`;
+}
+
+init();
+</script>
+</body>
+</html>
